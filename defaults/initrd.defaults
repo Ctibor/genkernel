@@ -111,15 +111,40 @@ GK_UDEV_TIMEOUT=120
 GK_USERINTERACTION_DISABLED_STATEFILE='/tmp/user-interaction.disabled'
 
 CRYPT_ENV_FILE='/etc/CRYPT_ENV.conf'
+CRYPT_SILENT=0
+CRYPT_TPM_DEVICE='/dev/tpmrm0'
+CRYPt_TPM_DEBUG=0
 CRYPT_ROOT_KEYDEV_FSTYPE='auto'
+CRYPT_ROOT_TPM_KEYDEV_FSTYPE='auto'
 CRYPT_ROOT_KEYFILE='/tmp/root.key'
 CRYPT_ROOT_OPENED_LOCKFILE='/tmp/ROOT.opened'
 CRYPT_ROOT_OPTIONS=''
-CRYPT_SILENT=0
+CRYPT_ROOT_TPM=''
+CRYPT_ROOT_TPM_KEYDEV=''
+CRYPT_ROOT_TPM_CTX='signing_key_root.ctx'
+CRYPT_ROOT_TPM_NAME='signing_key_root.name'
+CRYPT_ROOT_TPM_HANDLE='0x81010002'
+CRYPT_ROOT_TPM_PCRS='sha256:0,1,2,3,4,7,8,9'
+CRYPT_ROOT_TPM_POLICY='root.pcr.policy'
+CRYPT_ROOT_TPM_PUBKEY='signing_key_public_root.pem'
+CRYPT_ROOT_TPM_SESSION='session_root.ctx'
+CRYPT_ROOT_TPM_SIGNATURE='root.pcr.signature'
+
 CRYPT_SWAP_KEYDEV_FSTYPE='auto'
+CRYPT_SWAP_TPM_KEYDEV_FSTYPE='auto'
 CRYPT_SWAP_KEYFILE='/tmp/swap.key'
 CRYPT_SWAP_OPENED_LOCKFILE='/tmp/SWAP.opened'
 CRYPT_SWAP_OPTIONS=''
+CRYPT_SWAP_TPM=''
+CRYPT_SWAP_TPM_KEYDEV=''
+CRYPT_SWAP_TPM_CTX='signing_key_swap.ctx'
+CRYPT_SWAP_TPM_NAME='signing_key_swap.name'
+CRYPT_SWAP_TPM_HANDLE='0x81010002'
+CRYPT_SWAP_TPM_PCRS='sha256:0,1,2,3,4,7,8,9'
+CRYPT_SWAP_TPM_POLICY='swap.pcr.policy'
+CRYPT_SWAP_TPM_PUBKEY='signing_key_public_swap.pem'
+CRYPT_SWAP_TPM_SESSION='session_swap.ctx'
+CRYPT_SWAP_TPM_SIGNATURE='swap.pcr.signature'
 
 ROOTFSTYPE='auto'
 
@@ -153,7 +178,7 @@ DEFAULT_NFSOPTIONS="ro,nolock"
 # - modules
 HWOPTS_BLK='nvme sata scsi pata usb firewire waitscan'
 HWOPTS_OBSOLETE='pcmcia ataraid' # Obsolete stuff that might be useful on old hardware, do$X only.
-HWOPTS="keymap cache modules virtio hyperv ${HWOPTS_BLK} bcache lvm dmraid multipath mdadm zfs fs iscsi crypto"
+HWOPTS="keymap cache modules virtio hyperv ${HWOPTS_BLK} bcache lvm dmraid multipath mdadm zfs fs iscsi crypto tpm"
 
 # This is the set of default HWOPTS, in the order that they are loaded.
 # This is whitespace aligned with HWOPTS above.

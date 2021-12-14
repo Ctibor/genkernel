@@ -179,6 +179,8 @@ longusage() {
   echo "	--genzimage		Make and install kernelz image (PowerPC)"
   echo "	--luks			Include LUKS support"
   echo "	--no-luks		Exclude LUKS support"
+  echo "	--tpm Unlock LUKS encrypted root volume with TPM"
+  echo "	--no-tpm Do not use TPM to unlock root volume"
   echo "	--gpg			Include GPG-armored LUKS key support"
   echo "	--no-gpg		Exclude GPG-armored LUKS key support"
   echo "	--b2sum			Include b2sum"
@@ -836,6 +838,10 @@ parse_cmdline() {
 		--gpg|--no-gpg)
 			CMD_GPG=$(parse_optbool "$*")
 			print_info 3 "CMD_GPG: ${CMD_GPG}"
+			;;
+		--tpm*|--no-tpm)
+			CMD_TPM=$(parse_optbool "$*")
+			print_info 3 "CMD_TPM: ${CMD_TPM}"
 			;;
 		--firmware|--no-firmware)
 			CMD_FIRMWARE=$(parse_optbool "$*")

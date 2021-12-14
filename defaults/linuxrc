@@ -237,6 +237,57 @@ do
 		root_keydev_fstype=*)
 			CRYPT_ROOT_KEYDEV_FSTYPE=${x#*=}
 		;;
+		# TPM
+		tpm_device=*)
+			CRYPT_TPM_DEVICE=${x#*=}
+		;;
+		tpm_debug)
+			CRYPT_TPM_DEBUG=1
+		;;			
+		root_tpm)
+			CRYPT_ROOT_TPM=1
+			USE_CRYPTSETUP=1
+		;;
+		root_tpm_ctx=*)
+			CRYPT_ROOT_TPM_CTX=${x#*=}
+			CRYPT_ROOT_TPM=1
+		;;
+		root_tpm_keydev=*)
+			CRYPT_ROOT_TPM_KEYDEV=${x#*=}
+			CRYPT_ROOT_TPM=1
+		;;
+		root_tpm_keydev_fstype=*)
+			CRYPT_ROOT_TPM_KEYDEV_FSTYPE=${x#*=}
+			CRYPT_ROOT_TPM=1
+		;;
+		root_tpm_name=*)
+			CRYPT_ROOT_TPM_NAME=${x#*=}
+			CRYPT_ROOT_TPM=1
+		;;
+		root_tpm_handle=*)
+			CRYPT_ROOT_TPM_HANDLE=${x#*=}
+			CRYPT_ROOT_TPM=1
+		;;
+		root_tpm_pcrs=*)
+			CRYPT_ROOT_TPM_PCRS=${x#*=}
+			CRYPT_ROOT_TPM=1
+		;;
+		root_tpm_policy=*)
+			CRYPT_ROOT_TPM_POLICY=${x#*=}
+			CRYPT_ROOT_TPM=1
+		;;
+		root_tpm_pubkey=*)
+			CRYPT_ROOT_TPM_PUBKEY=${x#*=}
+			CRYPT_ROOT_TPM=1
+		;;
+		root_tpm_session=*)
+			CRYPT_ROOT_TPM_SESSION=${x#*=}
+			CRYPT_ROOT_TPM=1
+		;;
+		root_tpm_signature=*)
+			CRYPT_ROOT_TPM_SIGNATURE=${x#*=}
+			CRYPT_ROOT_TPM=1
+		;;
 		root_trim=*)
 			tmp_enabled=${x#*=}
 			if is_true "${tmp_enabled}"
@@ -253,6 +304,50 @@ do
 		;;
 		swap_keydev_fstype=*)
 			CRYPT_SWAP_KEYDEV_FSTYPE=${x#*=}
+		;;
+		swap_tpm)
+			CRYPT_SWAP_TPM=1
+			USE_CRYPTSETUP=1
+		;;
+		swap_tpm_ctx=*)
+			CRYPT_SWAP_TPM_CTX=${x#*=}
+			CRYPT_SWAP_TPM=1
+		;;
+		swap_tpm_keydev=*)
+			CRYPT_SWAP_TPM_KEYDEV=${x#*=}
+			CRYPT_SWAP_TPM=1
+		;;
+		swap_tpm_keydev_fstype=*)
+			CRYPT_SWAP_TPM_KEYDEV_FSTYPE=${x#*=}
+			CRYPT_SWAP_TPM=1
+		;;
+		swap_tpm_name=*)
+			CRYPT_SWAP_TPM_NAME=${x#*=}
+			CRYPT_SWAP_TPM=1
+		;;
+		swap_tpm_handle=*)
+			CRYPT_SWAP_TPM_HANDLE=${x#*=}
+			CRYPT_SWAP_TPM=1
+		;;
+		swap_tpm_pcrs=*)
+			CRYPT_SWAP_TPM_PCRS=${x#*=}
+			CRYPT_SWAP_TPM=1
+		;;
+		swap_tpm_policy=*)
+			CRYPT_SWAP_TPM_POLICY=${x#*=}
+			CRYPT_SWAP_TPM=1
+		;;
+		swap_tpm_pubkey=*)
+			CRYPT_SWAP_TPM_PUBKEY=${x#*=}
+			CRYPT_SWAP_TPM=1
+		;;
+		swap_tpm_session=*)
+			CRYPT_SWAP_TPM_SESSION=${x#*=}
+			CRYPT_SWAP_TPM=1
+		;;
+		swap_tpm_signature=*)
+			CRYPT_SWAP_TPM_SIGNATURE=${x#*=}
+			CRYPT_SWAP_TPM=1
 		;;
 		real_resume=*|resume=*)
 			REAL_RESUME=${x#*=}

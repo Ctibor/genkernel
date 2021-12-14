@@ -362,6 +362,7 @@ append_base_layout() {
 	usb:x:85:
 	input:x:97:
 	utmp:x:406:
+	tss:x:987:
 	nogroup:x:65533:
 	nobody:x:65534:
 	EOF
@@ -371,6 +372,7 @@ append_base_layout() {
 
 	cat >"${TDIR}"/etc/passwd <<-EOF
 	root:x:0:0:root:/root:/usr/bin/login-remote.sh
+	tss:x:102:987:tss:/dev/null:/sbin/nologin
 	nobody:x:65534:65534:nobody:/var/empty:/bin/false
 	EOF
 
@@ -486,6 +488,8 @@ append_base_layout() {
 	isTrue "${STRACE}" && build_parameters+=( --strace ) || build_parameters+=( --no-strace )
 	isTrue "${GPG}" && build_parameters+=( --gpg ) || build_parameters+=( --no-gpg )
 	isTrue "${LUKS}" && build_parameters+=( --luks ) || build_parameters+=( --no-luks )
+	isTrue "${TPM_ROOT}" && build_parameters+=( --tpm-root ) || build_parameters+=( --no-tpm-root )
+	isTrue "${TPM_SWAP}" && build_parameters+=( --tpm-swap ) || build_parameters+=( --no-tpm-swap )
 	isTrue "${FIRMWARE}" && build_parameters+=( --firmware ) || build_parameters+=( --no-firmware )
 	[ -n "${FIRMWARE_DIR}" ] && build_parameters+=( --firmware-dir="${FIRMWARE_DIR}" )
 	[ -n "${FIRMWARE_FILES}" ] && build_parameters+=( --firmware-files="${FIRMWARE_FILES}" )
@@ -1701,6 +1705,35 @@ append_firmware() {
 	fi
 }
 
+append_tpm() {
+		local PN="tpm"
+		local TDIR="${TEMP}/initramfs-${PN}-temp"
+		
+		local tpm_binaries="/usr/bin/tpm2
+						   /usr/lib64/libtss2-tcti-device.so
+						   "
+		if [ -d "${TDIR}" ]
+		then
+			rm -r "${TDIR}" || gen_die "Failed to clean out existing '${TDIR}'!"
+		fi
+		mkdir "${TDIR}" || gen_die "Failed to create '${TDIR}'!"
+		cd "${TDIR}" || gen_die "Failed to chdir to '${TDIR}'!"
+		if ! [ -e /usr/bin/tpm2 ]
+		then
+			gen_die "/usr/bin/tpm2 not found! Have you installed app-crypt/tpm2-tools?"
+		else
+			copy_binaries "${TDIR}" ${tpm_binaries}
+		fi
+		log_future_cpio_content
+		find . -print0 | "${CPIO_COMMAND}" ${CPIO_ARGS} --append -F "${CPIO_ARCHIVE}" \
+		|| gen_die "Failed to append ${PN} to cpio!"
+		cd "${TEMP}" || die "Failed to chdir to '${TEMP}'!"
+		if isTrue "${CLEANUP}"
+		then
+			rm -rf "${TDIR}"
+		fi
+}
+
 append_gpg() {
 	local PN=gnupg
 	local TDIR="${TEMP}/initramfs-${PN}-temp"
@@ -2058,6 +2091,7 @@ create_initramfs() {
 	append_data 'unionfs_fuse' "${UNIONFS}"
 	append_data 'xfsprogs' "${XFSPROGS}"
 	append_data 'zfs' "${ZFS}"
+	append_data 'tpm' "${TPM}"
 
 	if isTrue "${ZFS}"
 	then

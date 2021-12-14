@@ -504,6 +504,7 @@ then
 	isTrue "${LVM}"       && print_warning 1 '- Add "dolvm" for LVM support'
 	isTrue "${LUKS}"      && print_warning 1 '- Add "crypt_root=<device>" for LUKS-encrypted root'
 	isTrue "${LUKS}"      && print_warning 1 '- Add "crypt_swap=<device>" for LUKS-encrypted swap'
+	isTrue "${TPM}"       && print_warning 1 '- Add "root_tpm" or "swap_tpm" when you want to unlock LUKS-encrypted root / swap volume with keys stored in TPM 2.0'
 	isTrue "${SSH}"       && print_warning 1 '- Add "dosshd" to start SSH daemon in initramfs'
 
 	if isTrue "${ZFS}"
