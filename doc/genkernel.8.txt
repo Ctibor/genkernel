@@ -468,6 +468,12 @@ system is able to load multiple initramfs.
     `gpg --symmetric -o /path/to/LUKS-key.gpg /path/to/LUKS-key` .
     After that, re-point the *root_key* argument to the new .gpg file.
 
+*--*[*no-*]*keyctl*::
+    Includes or excludes support for keyutils keyctl.
+    This way a LUKS passphrase can be loaded into a keyring at boot time
+    to unlock multiple devices (root, swap, etc.) without retyping it for each
+    one.
+
 *--*[*no-*]*b2sum*::
     Includes or excludes b2sum in the initramfs.
     When enabled, this will compile coreutils' b2sum for you.
@@ -688,6 +694,19 @@ recognized by the kernel itself.
     cryptsetup when opening swap volume. Can be specified multiple
     times or separate multiple options with a comma.
 
+*root_header*=<...>::
+    In case your encrypted root uses a LUKS detached header, you can
+    use a device like a usb pen to store the header file. This value
+    should be the key path relative to the mount point.
+
+*root_headerdev*=<...>::
+    If necessary provide the name of the device that carries the
+    root_header. If unset while using root_header, it will automatically
+    look for the device in every boot.
+
+*root_headerdev_fstype*=<...>::
+    Used filesystem for *root_headerdev*. See *rootfstype* for more details.
+
 *root_key*=<...>::
     In case your root is encrypted with a key, you can use a device
     like a  usb pen to store the key.  This value should be the key
@@ -706,6 +725,15 @@ recognized by the kernel itself.
     with SSD setups.  Have a look at 'https://en.wikipedia.org/wiki/TRIM'
     for more information.
 
+*swap_header*=<...>::
+    Same as root_header for swap.
+
+*swap_headerdev*=<...>::
+    Same as root_headerdev for swap.
+
+*swap_headerdev_fstype*=<...>::
+    Used filesystem for *swap_headerdev*. See *rootfstype* for more details.
+
 *swap_key*=<...>::
     Same as root_key for swap.
 
@@ -714,6 +742,24 @@ recognized by the kernel itself.
 
 *swap_keydev_fstype*=<...>::
     Used filesystem for *swap_keydev*. See *rootfstype* for more details.
+
+*keyctl_keydesc*=<...>::
+    Load a passphrase into a keyring at boot time under the key name provided
+    as an argument to this option.
+    This way multiple devices (root, swap, etc.) can be unlocked without
+    retyping the passphrase for each one.
+    You'll need to add this key name as a keyring token to every LUKS device
+    that it is supposed to unlock - have a look at cryptsetup 'token add'
+    operation.
+
+*keyctl_keykeep*::
+    Don't remove the newly added key before starting the real init.
+    Useful if you want to utilize it to unlock LUKS devices post-initramfs.
+
+*keyctl_keytimeout*=<...>::
+    Enable a timeout (in seconds) for the newly added key.
+    This option normally only makes sense when used together with the
+    *keyctl_keykeep* option.
 
 *crypt_silent*::
     Set this to silent all the output related to the cryptographic

@@ -183,6 +183,8 @@ longusage() {
   echo "	--no-tpm Do not use TPM to unlock root volume"
   echo "	--gpg			Include GPG-armored LUKS key support"
   echo "	--no-gpg		Exclude GPG-armored LUKS key support"
+  echo "	--keyctl		Include keyctl support for loading LUKS passphrase into a keyring"
+  echo "	--no-keyctl		Exclude keyctl support for loading LUKS passphrase into a keyring"
   echo "	--b2sum			Include b2sum"
   echo "	--no-b2sum		Exclude b2sum"
   echo "	--busybox		Include busybox"
@@ -842,6 +844,9 @@ parse_cmdline() {
 		--tpm*|--no-tpm)
 			CMD_TPM=$(parse_optbool "$*")
 			print_info 3 "CMD_TPM: ${CMD_TPM}"
+		--keyctl|--no-keyctl)
+			CMD_KEYCTL=$(parse_optbool "$*")
+			print_info 3 "CMD_KEYCTL: ${CMD_KEYCTL}"
 			;;
 		--firmware|--no-firmware)
 			CMD_FIRMWARE=$(parse_optbool "$*")

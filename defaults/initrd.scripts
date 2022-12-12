@@ -288,7 +288,7 @@ bootstrapFS() {
 	fi
 
 	# Setup the filesystem nodes and directories
-	for i in ${CDROOT_PATH} /mnt/livecd /mnt/key /mnt/gentoo /tmp /tmp/.initrd /dev /proc /run /sys; do
+	for i in ${CDROOT_PATH} /mnt/header /mnt/livecd /mnt/key /mnt/gentoo /tmp /tmp/.initrd /dev /proc /run /sys; do
 		run mkdir -p "${NEW_ROOT}${i}"
 		run chmod 755 "${NEW_ROOT}${i}"
 	done
@@ -371,6 +371,14 @@ bootstrapCD() {
 			read -n1 -s
 		fi
 	fi
+}
+
+bootstrapHeader() {
+	# $1 = ROOT/SWAP
+	local HEADERDEVS=$(devicelist)
+	eval local headerloc='"${CRYPT_'${1}'_HEADER}"'
+
+	findmediamount "header" "${headerloc}" "CRYPT_${1}_HEADERDEV" "/mnt/header" ${HEADERDEVS}
 }
 
 bootstrapKey() {
@@ -1810,6 +1818,9 @@ openLUKS() {
 
 	local LUKS_NAME="${1}"
 	eval local LUKS_DEVICE='"${CRYPT_'${TYPE}'}"'
+	eval local LUKS_HEADER='"${CRYPT_'${TYPE}'_HEADER}"'
+	eval local LUKS_HEADERDEV='"${CRYPT_'${TYPE}'_HEADERDEV}"'
+	eval local LUKS_HEADERDEV_FSTYPE='"${CRYPT_'${TYPE}'_HEADERDEV_FSTYPE}"'
 	eval local LUKS_KEY='"${CRYPT_'${TYPE}'_KEY}"'
 	eval local LUKS_KEYDEV='"${CRYPT_'${TYPE}'_KEYDEV}"'
 	eval local LUKS_KEYDEV_FSTYPE='"${CRYPT_'${TYPE}'_KEYDEV_FSTYPE}"'
@@ -1825,8 +1836,12 @@ openLUKS() {
 	eval local LUKS_TPM_SESSION='"${CRYPT_'${TYPE}'_TPM_SESSION}"'
 	eval local LUKS_TPM_SIGNATURE='"${CRYPT_'${TYPE}'_TPM_SIGNATURE}"'
 	eval local OPENED_LOCKFILE='"${CRYPT_'${TYPE}'_OPENED_LOCKFILE}"'
-	local DEV_ERROR=0 KEY_ERROR=0 KEYDEV_ERROR=0 TPMDEV_ERROR=0 TPMKEY_ERROR=0
-	local mntkey="/mnt/key/" crypt_filter_ret= tpmmntkey="/mnt/tpmkey/"
+	eval local OPENED_LOCKFILE='"${CRYPT_'${TYPE}'_OPENED_LOCKFILE}"'
+	local DEV_ERROR=0
+	local HEADER_ERROR=0 HEADERDEV_ERROR=0
+	local KEY_ERROR=0 KEYDEV_ERROR=0
+	local TPMDEV_ERROR=0 TPMKEY_ERROR=0
+	local mntheader="/mnt/header/" mntkey="/mnt/key/" tpmmntkey="/mnt/tpmkey/" crypt_filter_ret=
 
 	if [ -z "${LUKS_DEVICE}" ]
 	then
@@ -1846,13 +1861,29 @@ openLUKS() {
 			good_msg "The LUKS device ${LUKS_DEVICE} meanwhile was opened by someone else."
 			break
 		# if crypt_silent=1 and some error occurs, enter shell quietly
-		elif [ \( ${CRYPT_SILENT} -eq 1 \) -a \( \( \( \( \( ${DEV_ERROR} -eq 1 \) -o \( ${KEY_ERROR} -eq 1 \) \) -o \( ${KEYDEV_ERROR} -eq 1 \) \) -o \( ${TPMDEV_ERROR} -eq 1 \) \) -o \( ${TPMKEY_ERROR} -eq 1 \) \) ]
+		elif [ \( ${CRYPT_SILENT} -eq 1 \) -a \( \( ${DEV_ERROR} -eq 1 \) \) ]
 		then
+			run_emergency_shell
+		elif [ \( ${CRYPT_SILENT} -eq 1 \) -a \( \( \( ${HEADER_ERROR} -eq 1 \) \) -o \( ${HEADERDEV_ERROR} -eq 1 \) \) ]
+		then
+			run_emergency_shell
+		elif [ \( ${CRYPT_SILENT} -eq 1 \) -a \( \( \( ${KEY_ERROR} -eq 1 \) \) -o \( ${KEYDEV_ERROR} -eq 1 \) \) ]
+		then
+			run_emergency_shell
+		elif [ \( ${CRYPT_SILENT} -eq 1 \) -a \( \( \( ${TPMDEV_ERROR} -eq 1 \) \) -o \( ${TPMKEY_ERROR} -eq 1 \) \) ]
 			run_emergency_shell
 		elif [ ${DEV_ERROR} -eq 1 ]
 		then
 			prompt_user "LUKS_DEVICE" "${LUKS_NAME}"
 			DEV_ERROR=0
+		elif [ ${HEADER_ERROR} -eq 1 ]
+		then
+			prompt_user "LUKS_HEADER" "${LUKS_NAME} header"
+			HEADER_ERROR=0
+		elif [ ${HEADERDEV_ERROR} -eq 1 ]
+		then
+			prompt_user "LUKS_HEADERDEV" "${LUKS_NAME} header device"
+			HEADERDEV_ERROR=0
 		elif [ ${KEY_ERROR} -eq 1 ]
 		then
 			prompt_user "LUKS_KEY" "${LUKS_NAME} key"
@@ -1886,100 +1917,179 @@ openLUKS() {
 				continue
 			fi
 
-			if ! run cryptsetup isLuks ${LUKS_DEVICE}
+			# Handle headers
+			if [ -n "${LUKS_HEADER}" ]
+			then
+				local REAL_LUKS_HEADERDEV="${LUKS_HEADERDEV}"
+				if [ ! -e "${mntheader}${LUKS_HEADER}" ]
+				then
+					REAL_LUKS_HEADERDEV=$(find_real_device "${LUKS_HEADERDEV}")
+					if [ -b "${REAL_LUKS_HEADERDEV}" ]
+					then
+						good_msg "Using header device ${REAL_LUKS_HEADERDEV}." ${CRYPT_SILENT}
+					else
+						good_msg "Please insert removable device ${LUKS_HEADERDEV} for ${LUKS_NAME}" ${CRYPT_SILENT}
+						# abort after 10 secs
+						local count=10
+						while [ ${count} -gt 0 ]
+						do
+							count=$((count-1))
+							sleep 1
+							REAL_LUKS_HEADERDEV=$(find_real_device "${LUKS_HEADERDEV}")
+							if [ -b "${REAL_LUKS_HEADERDEV}" ]
+							then
+								good_msg "Removable device ${REAL_LUKS_HEADERDEV} detected." ${CRYPT_SILENT}
+								break
+							fi
+						done
+						if [ ! -b "${REAL_LUKS_HEADERDEV}" ]
+						then
+							eval CRYPT_${TYPE}_HEADER=${LUKS_HEADER}
+							bootstrapHeader ${TYPE}
+							eval LUKS_HEADERDEV='"${CRYPT_'${TYPE}'_HEADERDEV}"'
+							REAL_LUKS_HEADERDEV=$(find_real_device "${LUKS_HEADERDEV}")
+							if [ ! -b "${REAL_LUKS_HEADERDEV}" ]
+							then
+								HEADERDEV_ERROR=1
+								bad_msg "Removable device ${LUKS_HEADERDEV} not found." ${CRYPT_SILENT}
+								continue
+							fi
+							# continue otherwise will mount headerdev which is mounted by bootstrap
+							continue
+						fi
+					fi
+
+					# At this point a device was recognized, now let's see if the header is there
+					[ ! -d "${mntheader}" ] && mkdir -p "${mntheader}" >/dev/null 2>&1
+
+					# determine fs -- 'auto' will not trigger module loading!
+					LUKS_HEADERDEV_FSTYPE=$(determine_fs "${REAL_LUKS_HEADERDEV}" "${LUKS_HEADERDEV_FSTYPE}")
+
+					if ! run mount -n -t ${LUKS_HEADERDEV_FSTYPE} -o ro ${REAL_LUKS_HEADERDEV} ${mntheader} >/dev/null 2>&1
+					then
+						HEADERDEV_ERROR=1
+						bad_msg "Mounting of device ${REAL_LUKS_HEADERDEV} failed." ${CRYPT_SILENT}
+						continue
+					fi
+
+					good_msg "Removable device ${REAL_LUKS_HEADERDEV} mounted." ${CRYPT_SILENT}
+					sleep 2
+
+					# headerfile exists?
+					if [ ! -e "${mntheader}${LUKS_HEADER}" ]
+					then
+						run umount -n "${mntheader}" >/dev/null 2>&1
+						HEADER_ERROR=1
+						HEADERDEV_ERROR=1
+						bad_msg "Header {LUKS_HEADER} on device ${REAL_LUKS_HEADERDEV} not found." ${CRYPT_SILENT}
+						continue
+					fi
+				fi
+
+				if ! run cryptsetup isLuks ${LUKS_DEVICE} --header ${mntheader}${LUKS_HEADER}
+				then
+					bad_msg "The LUKS device ${LUKS_DEVICE} does not contain a LUKS header" ${CRYPT_SILENT}
+					DEV_ERROR=1
+					continue
+				fi
+
+				# At this point a candidate header exists (either mounted before or not)
+				good_msg "${LUKS_HEADER} on device ${REAL_LUKS_HEADERDEV} found" ${CRYPT_SILENT}
+
+				cryptsetup_options="${cryptsetup_options} --header ${mntheader}${LUKS_HEADER}"
+			elif ! run cryptsetup isLuks ${LUKS_DEVICE}
 			then
 				bad_msg "The LUKS device ${LUKS_DEVICE} does not contain a LUKS header" ${CRYPT_SILENT}
 				DEV_ERROR=1
 				continue
-			else
-				if [ -n "${cryptsetup_options}" ]
+			fi
+
+				# Handle keys
+			if [ -n "${LUKS_KEY}" ]
+			then
+				local REAL_LUKS_KEYDEV="${LUKS_KEYDEV}"
+				if [ ! -e "${mntkey}${LUKS_KEY}" ]
 				then
-					good_msg "Using the following cryptsetup options for ${LUKS_NAME}: ${cryptsetup_options}" ${CRYPT_SILENT}
-				fi
-				# Handle keys on filesystem
-				if [ -n "${LUKS_KEY}" ]
-				then
-					local REAL_LUKS_KEYDEV="${LUKS_KEYDEV}"
-					if [ ! -e "${mntkey}${LUKS_KEY}" ]
+					REAL_LUKS_KEYDEV=$(find_real_device "${LUKS_KEYDEV}")
+					if [ -b "${REAL_LUKS_KEYDEV}" ]
 					then
-						REAL_LUKS_KEYDEV=$(find_real_device "${LUKS_KEYDEV}")
-						if [ -b "${REAL_LUKS_KEYDEV}" ]
+						good_msg "Using key device ${REAL_LUKS_KEYDEV}." ${CRYPT_SILENT}
+					else
+						good_msg "Please insert removable device ${LUKS_KEYDEV} for ${LUKS_NAME}" ${CRYPT_SILENT}
+						# abort after 10 secs
+						local count=10
+						while [ ${count} -gt 0 ]
+						do
+							count=$((count-1))
+							sleep 1
+							REAL_LUKS_KEYDEV=$(find_real_device "${LUKS_KEYDEV}")
+							if [ -b "${REAL_LUKS_KEYDEV}" ]
+							then
+								good_msg "Removable device ${REAL_LUKS_KEYDEV} detected." ${CRYPT_SILENT}
+								break
+							fi
+						done
+						if [ ! -b "${REAL_LUKS_KEYDEV}" ]
 						then
-							good_msg "Using key device ${REAL_LUKS_KEYDEV}." ${CRYPT_SILENT}
-						else
-							good_msg "Please insert removable device ${LUKS_KEYDEV} for ${LUKS_NAME}" ${CRYPT_SILENT}
-							# abort after 10 secs
-							local count=10
-							while [ ${count} -gt 0 ]
-							do
-								count=$((count-1))
-								sleep 1
-								REAL_LUKS_KEYDEV=$(find_real_device "${LUKS_KEYDEV}")
-								if [ -b "${REAL_LUKS_KEYDEV}" ]
-								then
-									good_msg "Removable device ${REAL_LUKS_KEYDEV} detected." ${CRYPT_SILENT}
-									break
-								fi
-							done
+							eval CRYPT_${TYPE}_KEY=${LUKS_KEY}
+							bootstrapKey ${TYPE}
+							eval LUKS_KEYDEV='"${CRYPT_'${TYPE}'_KEYDEV}"'
+							REAL_LUKS_KEYDEV=$(find_real_device "${LUKS_KEYDEV}")
 							if [ ! -b "${REAL_LUKS_KEYDEV}" ]
 							then
-								eval CRYPT_${TYPE}_KEY=${LUKS_KEY}
-								bootstrapKey ${TYPE}
-								eval LUKS_KEYDEV='"${CRYPT_'${TYPE}'_KEYDEV}"'
-								REAL_LUKS_KEYDEV=$(find_real_device "${LUKS_KEYDEV}")
-								if [ ! -b "${REAL_LUKS_KEYDEV}" ]
-								then
-									KEYDEV_ERROR=1
-									bad_msg "Removable device ${LUKS_KEYDEV} not found." ${CRYPT_SILENT}
-									continue
-								fi
-								# continue otherwise will mount keydev which is mounted by bootstrap
-								continue
-							fi
-						fi
-
-						# At this point a device was recognized, now let's see if the key is there
-						[ ! -d "${mntkey}" ] && mkdir -p "${mntkey}" >/dev/null 2>&1
-
-						# determine fs -- 'auto' will not trigger module loading!
-						LUKS_KEYDEV_FSTYPE=$(determine_fs "${REAL_LUKS_KEYDEV}" "${LUKS_KEYDEV_FSTYPE}")
-
-						if ! run mount -n -t ${LUKS_KEYDEV_FSTYPE} -o ro ${REAL_LUKS_KEYDEV} ${mntkey} >/dev/null 2>&1
-						then
-							KEYDEV_ERROR=1
-							bad_msg "Mounting of device ${REAL_LUKS_KEYDEV} failed." ${CRYPT_SILENT}
-							continue
-						else
-							good_msg "Removable device ${REAL_LUKS_KEYDEV} mounted." ${CRYPT_SILENT}
-							sleep 2
-							# keyfile exists?
-							if [ ! -e "${mntkey}${LUKS_KEY}" ]
-							then
-								run umount -n "${mntkey}" >/dev/null 2>&1
-								KEY_ERROR=1
 								KEYDEV_ERROR=1
-								bad_msg "Key {LUKS_KEY} on device ${REAL_LUKS_KEYDEV} not found." ${CRYPT_SILENT}
+								bad_msg "Removable device ${LUKS_KEYDEV} not found." ${CRYPT_SILENT}
 								continue
 							fi
+							# continue otherwise will mount keydev which is mounted by bootstrap
+							continue
 						fi
 					fi
-					# At this point a candidate key exists (either mounted before or not)
-					good_msg "${LUKS_KEY} on device ${REAL_LUKS_KEYDEV} found" ${CRYPT_SILENT}
-					if [ "$(echo ${LUKS_KEY} | grep -o '.gpg$')" = ".gpg" ]
+
+					# At this point a device was recognized, now let's see if the key is there
+					[ ! -d "${mntkey}" ] && mkdir -p "${mntkey}" >/dev/null 2>&1
+
+					# determine fs -- 'auto' will not trigger module loading!
+					LUKS_KEYDEV_FSTYPE=$(determine_fs "${REAL_LUKS_KEYDEV}" "${LUKS_KEYDEV_FSTYPE}")
+
+					if ! run mount -n -t ${LUKS_KEYDEV_FSTYPE} -o ro ${REAL_LUKS_KEYDEV} ${mntkey} >/dev/null 2>&1
 					then
-						if ! hash gpg >/dev/null 2>&1
-						then
-							bad_msg "GPG-encrypted key file provided but gpg program is missing. Was initramfs built without --gpg parameter?"
-							bad_msg "Falling back to passphrase usage!"
-						else
-							[ -e /dev/tty ] && run mv /dev/tty /dev/tty.org
-							run mknod /dev/tty c 5 1
-							cryptsetup_options="${cryptsetup_options} -d -"
-							get_luks_key="gpg --logger-file /dev/null --quiet --decrypt ${mntkey}${LUKS_KEY} |"
-						fi
-					else
-						cryptsetup_options="${cryptsetup_options} -d ${mntkey}${LUKS_KEY}"
+						KEYDEV_ERROR=1
+						bad_msg "Mounting of device ${REAL_LUKS_KEYDEV} failed." ${CRYPT_SILENT}
+						continue
 					fi
+
+					good_msg "Removable device ${REAL_LUKS_KEYDEV} mounted." ${CRYPT_SILENT}
+					sleep 2
+
+					# keyfile exists?
+					if [ ! -e "${mntkey}${LUKS_KEY}" ]
+					then
+						run umount -n "${mntkey}" >/dev/null 2>&1
+						KEY_ERROR=1
+						KEYDEV_ERROR=1
+						bad_msg "Key {LUKS_KEY} on device ${REAL_LUKS_KEYDEV} not found." ${CRYPT_SILENT}
+						continue
+					fi
+				fi
+
+				# At this point a candidate key exists (either mounted before or not)
+				good_msg "${LUKS_KEY} on device ${REAL_LUKS_KEYDEV} found" ${CRYPT_SILENT}
+				if [ "$(echo ${LUKS_KEY} | grep -o '.gpg$')" = ".gpg" ]
+				then
+					if ! hash gpg >/dev/null 2>&1
+					then
+						bad_msg "GPG-encrypted key file provided but gpg program is missing. Was initramfs built without --gpg parameter?"
+						bad_msg "Falling back to passphrase usage!"
+					else
+						[ -e /dev/tty ] && run mv /dev/tty /dev/tty.org
+						run mknod /dev/tty c 5 1
+						cryptsetup_options="${cryptsetup_options} -d -"
+						get_luks_key="gpg --logger-file /dev/null --quiet --decrypt ${mntkey}${LUKS_KEY} |"
+					fi
+				else
+					cryptsetup_options="${cryptsetup_options} -d ${mntkey}${LUKS_KEY}"
+				fi
 				# Key stored inside TPM chip
 				elif [ -n "${LUKS_TPM}" ]
 				then
@@ -2061,19 +2171,25 @@ openLUKS() {
 						cryptsetup_options="${cryptsetup_options} -d -"
 						get_luks_key="/usr/bin/tpm2 unseal -Q -T device:${CRYPT_TPM_DEVICE} -p session:${tpmmntkey}/${LUKS_TPM_SESSION} -c ${LUKS_TPM_HANDLE} |"
 					fi
-				fi
-				# At this point, keyfile or not, we're ready!
-				crypt_filter "${get_luks_key}cryptsetup ${cryptsetup_options} luksOpen ${LUKS_DEVICE} ${LUKS_NAME}"
-				crypt_filter_ret=$?
-				[ -e /dev/tty.org ] \
-					&& run rm -f /dev/tty \
-					&& run mv /dev/tty.org /dev/tty
+			fi
 
-				if [ ${crypt_filter_ret} -eq 0 ]
-				then
-					run touch "${OPENED_LOCKFILE}"
-					good_msg "LUKS device ${LUKS_DEVICE} opened" ${CRYPT_SILENT}
-					break
+			if [ -n "${cryptsetup_options}" ]
+			then
+				good_msg "Using the following cryptsetup options for ${LUKS_NAME}: ${cryptsetup_options}" ${CRYPT_SILENT}
+			fi
+
+			# At this point, {header,key,tpm}file or not, we're ready!
+			crypt_filter "${gpg_cmd}cryptsetup ${cryptsetup_options} luksOpen ${LUKS_DEVICE} ${LUKS_NAME}"
+			crypt_filter_ret=$?
+			[ -e /dev/tty.org ] \
+				&& run rm -f /dev/tty \
+				&& run mv /dev/tty.org /dev/tty
+
+			if [ ${crypt_filter_ret} -eq 0 ]
+			then
+				run touch "${OPENED_LOCKFILE}"
+				good_msg "LUKS device ${LUKS_DEVICE} opened" ${CRYPT_SILENT}
+				break
 				elif [ ${crypt_filter_ret} -ne 0 ] && [ -n "${LUKS_TPM}" ]
 				then
 					bad_msg "Failed to open LUKS device with TPM, trying passphrase"
@@ -2086,27 +2202,82 @@ openLUKS() {
 						good_msg "LUKS device ${LUKS_DEVICE} opened" ${CRYPT_SILENT}
 						break
 					fi
-				elif [ ! -e "${OPENED_LOCKFILE}" ]
-				then
-					bad_msg "Failed to open LUKS device ${LUKS_DEVICE}" ${CRYPT_SILENT}
-					DEV_ERROR=1
-					KEY_ERROR=1
-					KEYDEV_ERROR=1
+			elif [ ! -e "${OPENED_LOCKFILE}" ]
+			then
+				bad_msg "Failed to open LUKS device ${LUKS_DEVICE}" ${CRYPT_SILENT}
+				DEV_ERROR=1
+				HEADER_ERROR=1
+				HEADERDEV_ERROR=1
+				KEY_ERROR=1
+				KEYDEV_ERROR=1
 					TPMKEY_ERROR=1
 					TPMDEV_ERROR=1
-				fi
 			fi
 		fi
 	done
 
 	udevsettle
 
+	if run mountpoint "${mntheader}" >/dev/null 2>&1
+	then
+		run umount "${mntheader}" >/dev/null 2>&1
+	fi
+
 	if run mountpoint "${mntkey}" >/dev/null 2>&1
 	then
 		run umount "${mntkey}" >/dev/null 2>&1
 	fi
 
+	[ -d "${mntheader}" ] && run rmdir -p "${mntheader}" >/dev/null 2>&1
 	[ -d "${mntkey}" ] && run rmdir -p "${mntkey}" >/dev/null 2>&1
+}
+
+keyctl_keyadd() {
+	if [ -n "${KEYCTL_KEYDESC}" ]
+	then
+		if [ ! -x /bin/keyctl ]
+		then
+			bad_msg "keyctl program is missing. Was initramfs built without --keyctl parameter?"
+			exit 1
+		fi
+
+		# not using read to avoid secrets being left in memory
+		stty -echo
+		echo -n "Please type the key '${KEYCTL_KEYDESC}' for the user keyring then press Ctrl-D twice: "
+		KEYCTL_KEYID=`keyctl padd user "${KEYCTL_KEYDESC}" @u`
+		echo
+		stty echo
+
+		if [ -n "${KEYCTL_KEYID}" -a -n "${KEYCTL_KEYTIMEOUT}" ]
+		then
+			keyctl timeout "${KEYCTL_KEYID}" "${KEYCTL_KEYTIMEOUT}"
+		fi
+	fi
+}
+
+keyctl_keyremove() {
+	if [ -n "${KEYCTL_KEYID}" -a -z "${KEYCTL_KEYKEEP}" ]
+	then
+		if [ ! -x /bin/keyctl ]
+		then
+			bad_msg "keyctl program is missing. Was initramfs built without --keyctl parameter?"
+			exit 1
+		fi
+
+		keyctl revoke "${KEYCTL_KEYID}"
+		keyctl unlink "${KEYCTL_KEYID}" >/dev/null
+
+		# trust but verify
+		if keyctl show "${KEYCTL_KEYID}" >/dev/null 2>&1
+		then
+			# better reboot than leave the user passphrase accidentally exposed
+			bad_msg "unable to remove the newly added key from keyring, rebooting in 5 seconds for security"
+			sleep 5
+			reboot -f
+		fi
+
+		KEYCTL_KEYID=
+	fi
 }
 
 iface_name() {
@@ -2438,12 +2609,23 @@ ipv6_tentative() {
 	fi
 }
 
-start_LUKS() {
-	# if key is set but neither ssh enabled or key device is given, find
-	# the key device
+start_LUKS_root() {
+	# if key/header is set but neither ssh enabled or key device is given, find
+	# the key/header device
 
-	[ -n "${CRYPT_ROOT_KEY}" ] && [ -z "${CRYPT_ROOT_KEYDEV}" ] \
-		&& sleep 6 && bootstrapKey "ROOT"
+	if (
+		[ -n "${CRYPT_ROOT_KEY}" -a -z "${CRYPT_ROOT_KEYDEV}" ] ||
+		[ -n "${CRYPT_ROOT_HEADER}" -a -z "${CRYPT_ROOT_HEADERDEV}" ]
+	)
+	then
+		sleep 6
+	fi
+
+	[ -n "${CRYPT_ROOT_KEY}" -a -z "${CRYPT_ROOT_KEYDEV}" ] \
+		&& bootstrapKey "ROOT"
+
+	[ -n "${CRYPT_ROOT_HEADER}" -a -z "${CRYPT_ROOT_HEADERDEV}" ] \
+		&& bootstrapHeader "ROOT"
 
 	if [ -n "${CRYPT_ROOT}" ]
 	then
@@ -2456,10 +2638,24 @@ start_LUKS() {
 			REAL_ROOT="/dev/mapper/root"
 		fi
 	fi
+}
 
+start_LUKS_swap() {
 	# same for swap, but no need to sleep if root was unencrypted
-	[ -n "${CRYPT_SWAP_KEY}" ] && [ -z "${CRYPT_SWAP_KEYDEV}" ] \
-		&& { [ -z "${CRYPT_ROOT}" ] && sleep 6; bootstrapKey "SWAP"; }
+
+	if (
+		[ -n "${CRYPT_SWAP_KEY}" -a -z "${CRYPT_SWAP_KEYDEV}" ] ||
+		[ -n "${CRYPT_SWAP_HEADER}" -a -z "${CRYPT_SWAP_HEADERDEV}" ]
+	)
+	then
+		[ -z "${CRYPT_ROOT}" ] && sleep 6
+	fi
+
+	[ -n "${CRYPT_SWAP_KEY}" -a -z "${CRYPT_SWAP_KEYDEV}" ] \
+		&& bootstrapKey "SWAP"
+
+	[ -n "${CRYPT_SWAP_HEADER}" -a -z "${CRYPT_SWAP_HEADERDEV}" ] \
+		&& bootstrapHeader "SWAP"
 
 	if [ -n "${CRYPT_SWAP}" ]
 	then

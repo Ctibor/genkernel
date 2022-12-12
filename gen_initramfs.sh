@@ -486,6 +486,7 @@ append_base_layout() {
 	isTrue "${ZFS}" && build_parameters+=( --zfs ) || build_parameters+=( --no-zfs )
 	isTrue "${SPLASH}" && build_parameters+=( --splash ) || build_parameters+=( --no-splash )
 	isTrue "${STRACE}" && build_parameters+=( --strace ) || build_parameters+=( --no-strace )
+	isTrue "${KEYCTL}" && build_parameters+=( --keyctl ) || build_parameters+=( --no-keyctl )
 	isTrue "${GPG}" && build_parameters+=( --gpg ) || build_parameters+=( --no-gpg )
 	isTrue "${LUKS}" && build_parameters+=( --luks ) || build_parameters+=( --no-luks )
 	isTrue "${TPM_ROOT}" && build_parameters+=( --tpm-root ) || build_parameters+=( --no-tpm-root )
@@ -897,6 +898,33 @@ append_iscsi() {
 	log_future_cpio_content
 	find . -print0 | "${CPIO_COMMAND}" ${CPIO_ARGS} --append -F "${CPIO_ARCHIVE}" \
 		|| gen_die "Failed to append iscsi to cpio!"
+
+	cd "${TEMP}" || die "Failed to chdir to '${TEMP}'!"
+	if isTrue "${CLEANUP}"
+	then
+		rm -rf "${TDIR}"
+	fi
+}
+
+append_keyutils() {
+	local PN=keyutils
+	local TDIR="${TEMP}/initramfs-${PN}-temp"
+	if [ -d "${TDIR}" ]
+	then
+		rm -r "${TDIR}" || gen_die "Failed to clean out existing '${TDIR}'!"
+	fi
+
+	populate_binpkg ${PN}
+
+	mkdir "${TDIR}" || gen_die "Failed to create '${TDIR}'!"
+
+	unpack "$(get_gkpkg_binpkg "${PN}")" "${TDIR}"
+
+	cd "${TDIR}" || gen_die "Failed to chdir to '${TDIR}'!"
+
+	log_future_cpio_content
+	find . -print0 | "${CPIO_COMMAND}" ${CPIO_ARGS} --append -F "${CPIO_ARCHIVE}" \
+		|| gen_die "Failed to append ${PN} to cpio!"
 
 	cd "${TEMP}" || die "Failed to chdir to '${TEMP}'!"
 	if isTrue "${CLEANUP}"
@@ -2040,11 +2068,14 @@ append_auxiliary() {
 }
 
 append_data() {
-	local name=$1 var=$2
+	[ $# -eq 0 ] && gen_die "append_data() called with zero arguments"
+
+	local name=$1
 	local func="append_${name}"
 
-	[ $# -eq 0 ] && gen_die "append_data() called with zero arguments"
-	if [ $# -eq 1 ] || isTrue "${var}"
+	shift
+
+	if [ $# -eq 0 ] || anyTrue "$@"
 	then
 		print_info 1 "$(get_indent 1)>> Appending ${name} cpio data ..."
 		${func} || gen_die "${func}() failed!"
@@ -2070,7 +2101,7 @@ create_initramfs() {
 	append_data 'base_layout'
 	append_data 'util-linux'
 	append_data 'eudev'
-	append_data 'devicemanager'
+	append_data 'devicemanager' "${DMRAID}" "${LVM}" "${LUKS}" "${MULTIPATH}"
 	append_data 'auxiliary' "${BUSYBOX}"
 	append_data 'busybox' "${BUSYBOX}"
 	append_data 'b2sum' "${B2SUM}"
@@ -2080,6 +2111,7 @@ create_initramfs() {
 	append_data 'e2fsprogs' "${E2FSPROGS}"
 	append_data 'gpg' "${GPG}"
 	append_data 'iscsi' "${ISCSI}"
+	append_data 'keyutils' "${KEYCTL}"
 	append_data 'luks' "${LUKS}"
 	append_data 'lvm' "${LVM}"
 	append_data 'bcache' "${BCACHE}"

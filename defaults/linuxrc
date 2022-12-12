@@ -228,6 +228,15 @@ do
 		crypt_swap_options=*)
 			CRYPT_SWAP_OPTIONS=$(echo ${CRYPT_SWAP_OPTIONS} ${x#*=} | sed -e 's/,/ /g')
 		;;
+		root_header=*)
+			CRYPT_ROOT_HEADER=${x#*=}
+		;;
+		root_headerdev=*)
+			CRYPT_ROOT_HEADERDEV=${x#*=}
+		;;
+		root_headerdev_fstype=*)
+			CRYPT_ROOT_HEADERDEV_FSTYPE=${x#*=}
+		;;
 		root_key=*)
 			CRYPT_ROOT_KEY=${x#*=}
 		;;
@@ -296,6 +305,15 @@ do
 			fi
 			unset tmp_enabled
 		;;
+		swap_header=*)
+			CRYPT_SWAP_HEADER=${x#*=}
+		;;
+		swap_headerdev=*)
+			CRYPT_SWAP_HEADERDEV=${x#*=}
+		;;
+		swap_headerdev_fstype=*)
+			CRYPT_SWAP_HEADERDEV_FSTYPE=${x#*=}
+		;;
 		swap_key=*)
 			CRYPT_SWAP_KEY=${x#*=}
 		;;
@@ -348,6 +366,15 @@ do
 		swap_tpm_signature=*)
 			CRYPT_SWAP_TPM_SIGNATURE=${x#*=}
 			CRYPT_SWAP_TPM=1
+		;;
+		keyctl_keydesc=*)
+			KEYCTL_KEYDESC=${x#*=}
+		;;
+		keyctl_keytimeout=*)
+			KEYCTL_KEYTIMEOUT=${x#*=}
+		;;
+		keyctl_keykeep)
+			KEYCTL_KEYKEEP=1
 		;;
 		real_resume=*|resume=*)
 			REAL_RESUME=${x#*=}
@@ -733,10 +760,24 @@ then
 	start_sshd
 fi
 
+keyctl_keyadd
+
 # Initialize LUKS root device except for livecd's
 if [ "${CDROOT}" != '1' ]
 then
-	start_LUKS
+	if ( [ -n "${CRYPT_SWAP_KEY}" ] && [ -z "${CRYPT_SWAP_KEYDEV}" ] ) || \
+	   ( [ -n "${CRYPT_SWAP_HEADER}" ] && [ -z "${CRYPT_SWAP_HEADERDEV}" ] ) || \
+	   ( [ "${REAL_ROOT}" = "${REAL_RESUME}" ] || [ "${USE_LVM_NORMAL}" = '1' ] )
+	then
+		# the swap key or header might be on the root fs so start it first in this case
+		start_LUKS_root
+		luks_root_started=1
+		start_LUKS_swap
+	else
+		# we don't need to start the root at all if we are resuming from suspend
+		start_LUKS_swap
+	fi
+
 	if [ "${NORESUME}" != '1' ] && [ -n "${REAL_RESUME}" ]
 	then
 		case "${REAL_RESUME}" in
@@ -767,6 +808,11 @@ then
 		esac
 
 		do_resume
+	fi
+
+	if [ -z "${luks_root_started}" ]
+	then
+		start_LUKS_root
 	fi
 fi
 
@@ -1137,7 +1183,8 @@ then
 		losetup /dev/loop0 "${CDROOT_PATH}/${LOOPEXT}${LOOP}"
 		test_success 'Preparing loop filesystem'
 
-		start_LUKS
+		start_LUKS_root
+		start_LUKS_swap
 
 		case ${LOOPTYPE} in
 			normal)
@@ -1379,6 +1426,8 @@ else
 	fi
 fi # if [ "${CDROOT}" = '1' ]
 
+keyctl_keyremove
+
 # Re-run to ensure $NEWROOT/etc/initramfs.mounts was processed at least once
 process_initramfs_mounts
 
@@ -1453,7 +1502,7 @@ do
 	if  ! mountpoint "${CHROOT}" 1>/dev/null 2>&1
 	then
 		bad_msg "${CHROOT} is not a mountpoint; Was root device (${REAL_ROOT}) not mounted?"
-	elif ! chroot "${CHROOT}" test -x /${init#/} 1>/dev/null 2>&1
+	elif ! chroot "${CHROOT}" /usr/bin/test -x /${init#/} 1>/dev/null 2>&1
 	then
 		mounted_root_device=$(mountpoint -n /newroot 2>/dev/null | awk '{ print $1 }')
 		bad_msg "init (${init}) not found in mounted root device (${mounted_root_device})!"
