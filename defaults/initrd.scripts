@@ -1871,6 +1871,7 @@ openLUKS() {
 		then
 			run_emergency_shell
 		elif [ \( ${CRYPT_SILENT} -eq 1 \) -a \( \( \( ${TPMDEV_ERROR} -eq 1 \) \) -o \( ${TPMKEY_ERROR} -eq 1 \) \) ]
+		then
 			run_emergency_shell
 		elif [ ${DEV_ERROR} -eq 1 ]
 		then
@@ -2004,7 +2005,7 @@ openLUKS() {
 				continue
 			fi
 
-				# Handle keys
+			# Handle keys
 			if [ -n "${LUKS_KEY}" ]
 			then
 				local REAL_LUKS_KEYDEV="${LUKS_KEYDEV}"
@@ -2179,7 +2180,7 @@ openLUKS() {
 			fi
 
 			# At this point, {header,key,tpm}file or not, we're ready!
-			crypt_filter "${gpg_cmd}cryptsetup ${cryptsetup_options} luksOpen ${LUKS_DEVICE} ${LUKS_NAME}"
+			crypt_filter "${get_luks_key}cryptsetup ${cryptsetup_options} luksOpen ${LUKS_DEVICE} ${LUKS_NAME}"
 			crypt_filter_ret=$?
 			[ -e /dev/tty.org ] \
 				&& run rm -f /dev/tty \
@@ -2190,18 +2191,18 @@ openLUKS() {
 				run touch "${OPENED_LOCKFILE}"
 				good_msg "LUKS device ${LUKS_DEVICE} opened" ${CRYPT_SILENT}
 				break
-				elif [ ${crypt_filter_ret} -ne 0 ] && [ -n "${LUKS_TPM}" ]
+			elif [ ${crypt_filter_ret} -ne 0 ] && [ -n "${LUKS_TPM}" ]
+			then
+				bad_msg "Failed to open LUKS device with TPM, trying passphrase" ${CRYPT_SILET}
+				cryptsetup_options=""
+				crypt_filter "cryptsetup luksOpen ${LUKS_DEVICE} ${LUKS_NAME}"
+				crypt_filter_ret=$?
+				if [ ${crypt_filter_ret} -eq 0 ]
 				then
-					bad_msg "Failed to open LUKS device with TPM, trying passphrase"
-					cryptsetup_options=""
-					crypt_filter "cryptsetup luksOpen ${LUKS_DEVICE} ${LUKS_NAME}"
-					crypt_filter_ret=$?
-					if [ ${crypt_filter_ret} -eq 0 ]
-					then
-						run touch "${OPENED_LOCKFILE}"
-						good_msg "LUKS device ${LUKS_DEVICE} opened" ${CRYPT_SILENT}
-						break
-					fi
+					run touch "${OPENED_LOCKFILE}"
+					good_msg "LUKS device ${LUKS_DEVICE} opened" ${CRYPT_SILENT}
+					break
+				fi
 			elif [ ! -e "${OPENED_LOCKFILE}" ]
 			then
 				bad_msg "Failed to open LUKS device ${LUKS_DEVICE}" ${CRYPT_SILENT}
@@ -2210,8 +2211,8 @@ openLUKS() {
 				HEADERDEV_ERROR=1
 				KEY_ERROR=1
 				KEYDEV_ERROR=1
-					TPMKEY_ERROR=1
-					TPMDEV_ERROR=1
+				TPMKEY_ERROR=1
+				TPMDEV_ERROR=1
 			fi
 		fi
 	done
@@ -2668,6 +2669,7 @@ start_LUKS_swap() {
 	fi
 	# Clear PCR registers
 	if [ "${CRYPT_ROOT_TPM}" -eq 1 ] || [ "${CRYPT_SWAP_TPM}" -eq 1 ] && [ "${CRYPT_TPM_DEBUG}" -eq 1 ]
+	then
 		for pcr in $(echo "${LUKS_TPM_PCRS}" | sed 's/,/\ /g')
 		do
 			/usr/bin/tpm2 pcrextend -Q -T "device:${CRYPT_TPM_DEVICE}" "${pcr}:sha256=0000000000000000000000000000000000000000000000000000000000000000"

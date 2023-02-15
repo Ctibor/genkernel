@@ -86,6 +86,8 @@ longusage() {
   echo "  Low-Level Compile settings"
   echo "	--cross-compile=<target-triplet>"
   echo "				Target triple (i.e. aarch64-linux-gnu) to build for"
+  echo "	--kernel-cross-compile=<target-triplet>"
+  echo "				Target triple (i.e. aarch64-linux-gnu) to build kernel for"
   echo "	--kernel-ar=<archiver>	Archiver to use for kernel"
   echo "	--kernel-as=<assembler>	Assembler to use for kernel"
   echo "	--kernel-cc=<compiler>	Compiler to use for kernel (e.g. distcc)"
@@ -305,6 +307,10 @@ parse_cmdline() {
 		--cross-compile=*)
 			CMD_CROSS_COMPILE="${*#*=}"
 			print_info 3 "CMD_CROSS_COMPILE: ${CMD_CROSS_COMPILE}"
+			;;
+			--kernel-cross-compile=*)
+			CMD_KERNEL_CROSS_COMPILE="${*#*=}"
+			print_info 3 "CMD_KERNEL_CROSS_COMPILE: ${CMD_KERNEL_CROSS_COMPILE}"
 			;;
 		--kernel-ar=*)
 			CMD_KERNEL_AR="${*#*=}"
@@ -844,6 +850,7 @@ parse_cmdline() {
 		--tpm*|--no-tpm)
 			CMD_TPM=$(parse_optbool "$*")
 			print_info 3 "CMD_TPM: ${CMD_TPM}"
+			;;
 		--keyctl|--no-keyctl)
 			CMD_KEYCTL=$(parse_optbool "$*")
 			print_info 3 "CMD_KEYCTL: ${CMD_KEYCTL}"
