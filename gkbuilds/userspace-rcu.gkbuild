@@ -1,0 +1,13 @@
+# Copyright 2023 Gentoo Authors
+# Distributed under the terms of the GNU General Public License v2
+
+src_configure() {
+	gkconf --enable-static
+}
+
+src_install() {
+	default
+
+	rm -rf "${D}"/usr/share
+}
+

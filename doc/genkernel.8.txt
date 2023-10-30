@@ -198,9 +198,7 @@ specified.
 *--*[*no-*]*module-rebuild*::
     Runs, or does not run "emerge --ignore-default-opts --buildpkg=n --usepkg=n --quiet-build=y @module-rebuild"
     to build out-of-tree modules when possible, i.e. when non-static
-    kernel and modules will be build, installed,
-    *--kernel-modules-prefix* is not set, '/var/lib/module-rebuild/moduledb' exists
-    and is not empty.
+    kernel and modules will be built, installed, *--kernel-modules-prefix* is not set.
 
 NOTE: Command can be customized using '--module-rebuild-cmd' command-line
 argument or 'MODULEREBUILD_CMD' in '/etc/genkernel.conf'.
@@ -358,6 +356,13 @@ INITIALIZATION
     If the extra argument is specified,  splash is forced using
     <theme>  rather than the default theme specified in your splash
     configuration. If *--no-splash* is specified, then splash is disabled.
+
+*--*[*no-*]*plymouth*::
+    Includes or excludes Plymouth from the initramfs. If "splash" is
+    passed at boot, Plymouth will be activated.
+
+*--plymouth-theme*=<theme>::
+    Embeds the given Plymouth theme into the initramfs.
 
 *--do-keymap-auto*::
     Force keymap selection at boot.

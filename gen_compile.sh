@@ -27,13 +27,6 @@ compile_external_modules() {
 		return
 	fi
 
-	local modulesdb_file="/var/lib/module-rebuild/moduledb"
-	if [ ! -s "${modulesdb_file}" ]
-	then
-		print_info 2 "$(get_indent 1)>> '${modulesdb_file}' does not exist or is empty; Skipping '${MODULEREBUILD_CMD}' ..."
-		return
-	fi
-
 	local -x KV_OUT_DIR="${KERNEL_OUTPUTDIR}"
 
 	print_info 1 "$(get_indent 1)>> Compiling out-of-tree module(s) ..."

@@ -388,6 +388,7 @@ determine_real_args() {
 	set_config_with_override STRING MODPROBEDIR                           CMD_MODPROBEDIR                           "/etc/modprobe.d"
 
 	set_config_with_override BOOL   SPLASH                                CMD_SPLASH                                "no"
+	set_config_with_override BOOL   PLYMOUTH                              CMD_PLYMOUTH                              "no"
 	set_config_with_override BOOL   CLEAR_CACHEDIR                        CMD_CLEAR_CACHEDIR                        "no"
 	set_config_with_override BOOL   POSTCLEAR                             CMD_POSTCLEAR                             "no"
 	set_config_with_override BOOL   MRPROPER                              CMD_MRPROPER                              "yes"
@@ -445,6 +446,7 @@ determine_real_args() {
 	set_config_with_override BOOL   VIRTIO                                CMD_VIRTIO                                "no"
 	set_config_with_override BOOL   MULTIPATH                             CMD_MULTIPATH                             "no"
 	set_config_with_override BOOL   FIRMWARE                              CMD_FIRMWARE                              "no"
+	set_config_with_override BOOL   ALLFIRMWARE                           CMD_ALLFIRMWARE                           "no"
 	set_config_with_override STRING FIRMWARE_DIR                          CMD_FIRMWARE_DIR                          "/lib/firmware"
 	set_config_with_override STRING FIRMWARE_FILES                        CMD_FIRMWARE_FILES
 	set_config_with_override BOOL   FIRMWARE_INSTALL                      CMD_FIRMWARE_INSTALL                      "no"
@@ -971,7 +973,7 @@ determine_real_args() {
 		then
 			if [[ "${CMD_BOOTFONT}" == "current" ]]
 			then
-				SETFONT_COMMAND="$(which setfont 2>/dev/null)"
+				SETFONT_COMMAND="$(type -P setfont 2>/dev/null)"
 				if [ -z "${SETFONT_COMMAND}" ]
 				then
 					gen_die "setfont not found. Is sys-apps/kbd installed?"
@@ -1020,6 +1022,21 @@ determine_real_args() {
 			then
 				gen_die "splash_geninitramfs is required for --splash but was not found!"
 			fi
+		fi
+
+		if isTrue "${PLYMOUTH}" && isTrue "${SPLASH}"
+		then
+			gen_die "--plymouth and --splash are mutually exclusive!"
+		fi
+
+		if isTrue "${PLYMOUTH}" && ! isTrue "${FIRMWARE}"
+		then
+			print_warning 3 "--plymouth potentially requires graphics firmware to function! Please configure your --firmware flags appropriately!"
+		fi
+
+		if isTrue "${PLYMOUTH}" && ! isTrue "${ALLRAMDISKMODULES}"
+		then
+			print_warning 3 "--plymouth potentially requires DRM kernel modules to function! Please configure your --ramdisk-modules flags appropriately!"
 		fi
 
 		if isTrue "${SSH}"
@@ -1080,7 +1097,7 @@ determine_real_args() {
 			if [ ! -x "/lib/udev/scsi_id" ]
 			then
 				local error_msg="'/lib/udev/scsi_id' is required for --multipath but file does not exist or is not executable!"
-				error_msg+=" This file is usually provided by sys-fs/{eudev,udev} or sys-apps/systemd!"
+				error_msg+=" This file is usually provided by: sys-apps/systemd-utils, sys-fs/eudev, or sys-apps/systemd!"
 				gen_die "${error_msg}"
 			fi
 
@@ -1140,15 +1157,15 @@ determine_real_args() {
 			fi
 		fi
 
-		DU_COMMAND="$(which du 2>/dev/null)"
+		DU_COMMAND="$(type -P du 2>/dev/null)"
 
-		LDDTREE_COMMAND="$(which lddtree 2>/dev/null)"
+		LDDTREE_COMMAND="$(type -P lddtree 2>/dev/null)"
 		if [ -z "${LDDTREE_COMMAND}" ]
 		then
 			gen_die "lddtree not found. Is app-misc/pax-utils installed?"
 		fi
 
-		CPIO_COMMAND="$(which cpio 2>/dev/null)"
+		CPIO_COMMAND="$(type -P cpio 2>/dev/null)"
 		if [[ -z "${CPIO_COMMAND}" ]]
 		then
 			# This will be fatal because we cpio either way
@@ -1193,7 +1210,7 @@ determine_real_args() {
 				gen_die "SANDBOX_ON=1 detected -- You cannot use --sandbox when already running within a sandbox!"
 			fi
 
-			SANDBOX_COMMAND="$(which sandbox 2>/dev/null)"
+			SANDBOX_COMMAND="$(type -P sandbox 2>/dev/null)"
 			if [ -z "${SANDBOX_COMMAND}" ]
 			then
 				gen_die "Sandbox not found. Is sys-apps/sandbox installed?"
@@ -1217,7 +1234,7 @@ determine_real_args() {
 
 	if isTrue "${need_tar}"
 	then
-		TAR_COMMAND="$(which tar 2>/dev/null)"
+		TAR_COMMAND="$(type -P tar 2>/dev/null)"
 		if [ -z "${TAR_COMMAND}" ]
 		then
 			gen_die "tar not found. Is app-arch/tar installed?"
@@ -1232,7 +1249,7 @@ determine_real_args() {
 		fi
 	fi
 
-	KMOD_CMD=$(which kmod 2>/dev/null)
+	KMOD_CMD=$(type -P kmod 2>/dev/null)
 	if ! isTrue "${BUILD_STATIC}"
 	then
 		if [ -z "${KMOD_CMD}" ]

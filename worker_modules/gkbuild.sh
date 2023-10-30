@@ -197,7 +197,7 @@ _gkbuild_main() {
 		then
 			found_dyn_files=$(scanelf -E ET_DYN "${executable_files_to_scan[@]}" 2>/dev/null)
 		fi
-	
+
 		if [[ -n "${found_dyn_files}" ]]
 		then
 			print_error 1 "Found the following dynamically linked programs:"

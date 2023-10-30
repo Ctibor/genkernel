@@ -53,6 +53,8 @@ longusage() {
   echo "	--no-mrproper		Do not run 'make mrproper' before compilation"
   echo "	--splash		Install framebuffer splash support into initramfs"
   echo "	--no-splash		Do not install framebuffer splash"
+  echo "	--plymouth		Enable Plymouth support"
+  echo "	--no-plymouth		Do not enable Plymouth support"
   echo "	--install		Install the kernel after building"
   echo "	--no-install		Do not install the kernel after building"
   echo "	--symlink		Manage symlinks in /boot for installed images"
@@ -60,6 +62,7 @@ longusage() {
   echo "	--ramdisk-modules	Copy required modules to the initramfs"
   echo "	--no-ramdisk-modules	Don't copy any modules to the initramfs"
   echo "	--all-ramdisk-modules	Copy all kernel modules to the initramfs"
+  echo "	--no-all-ramdisk-modules	Don't copy all kernel modules to the initramfs"
   echo "	--module-rebuild	Automatically run 'emerge @module-rebuild' when"
   echo "				necessary (and possible)"
   echo "	--no-module-rebuild	Don't automatically run 'emerge @module-rebuild'"
@@ -129,6 +132,7 @@ longusage() {
   echo "	--splash-res=<res>	Select splash theme resolutions to install"
   echo "	--splash=<theme>	Enable framebuffer splash using <theme>"
   echo "	--splash-res=<res>	Select splash theme resolutions to install"
+  echo "	--plymouth-theme=<theme>    Embed the given Plymouth theme"
   echo "	--do-keymap-auto	Forces keymap selection at boot"
   echo "	--keymap		Enables keymap selection support"
   echo "	--no-keymap		Disables keymap selection support"
@@ -238,6 +242,9 @@ longusage() {
   echo "	--initramfs-symlink-name=<...>"
   echo "				Set initramfs symlink name"
   echo "	--firmware		Enable copying of firmware into initramfs"
+  echo "	--no-firmware	Disable copying of firmware into initramfs"
+  echo "	--all-firmware	Enable copying of all firmware into initramfs"
+  echo "	--no-all-firmware	Disable copying of all firmware into initramfs"
   echo "	--firmware-dir=<dir>"
   echo "				Specify directory to copy firmware from (defaults"
   echo "				to /lib/firmware)"
@@ -680,6 +687,17 @@ parse_cmdline() {
 			SPLASH_RES="${*#*=}"
 			print_info 3 "SPLASH_RES: ${SPLASH_RES}"
 			;;
+		--plymouth)
+			CMD_PLYMOUTH="yes"
+			PLYMOUTH_THEME='text'
+			print_info 3 "CMD_PLYMOUTH: ${CMD_PLYMOUTH}"
+			;;
+		--plymouth-theme=*)
+			CMD_PLYMOUTH="yes"
+			PLYMOUTH_THEME="${*#*=}"
+			print_info 3 "CMD_PLYMOUTH: ${CMD_PLYMOUTH}"
+			print_info 3 "PLYMOUTH_THEME: ${PLYMOUTH_THEME}"
+			;;
 		--install|--no-install)
 			CMD_INSTALL=$(parse_optbool "$*")
 			print_info 3 "CMD_INSTALL: ${CMD_INSTALL}"
@@ -858,6 +876,10 @@ parse_cmdline() {
 		--firmware|--no-firmware)
 			CMD_FIRMWARE=$(parse_optbool "$*")
 			print_info 3 "CMD_FIRMWARE: ${CMD_FIRMWARE}"
+			;;
+		--all-firmware|--no-all-firmware)
+			CMD_ALLFIRMWARE=$(parse_optbool "$*")
+			print_info 3 "CMD_FIRMWARE: ${CMD_ALLFIRMWARE}"
 			;;
 		--firmware-dir=*)
 			CMD_FIRMWARE_DIR="${*#*=}"

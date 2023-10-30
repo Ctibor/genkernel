@@ -1,0 +1,11 @@
+--- a/usr/Makefile
++++ b/usr/Makefile
+@@ -99,7 +99,7 @@ iscsiadm: $(ISCSI_LIB_OBJS) $(SYSDEPS_OBJS) $(DISCOVERY_OBJS) $(FW_BOOT_OBJS) \
+ 
+ iscsistart: $(ISCSI_LIB_OBJS) $(SYSDEPS_OBJS) $(INITIATOR_OBJS) $(FW_BOOT_OBJS) \
+ 	$(ISCSISTART_OBJS)
+-	$(CC) $(CFLAGS) $^ -o $@ -lcrypto -lrt $(LDFLAGS) $(ISCSI_LIB)
++	$(CC) $(CFLAGS) $^ -o $@ -static -lcrypto -lrt $(LDFLAGS) $(ISCSI_LIB)
+ 
+ install: $(DESTDIR)$(SBINDIR) $(PROGRAMS_DEST)
+ 

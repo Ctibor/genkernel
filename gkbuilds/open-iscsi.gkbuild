@@ -1,4 +1,4 @@
-# Copyright 1999-2019 Gentoo Authors
+# Copyright 1999-2023 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 src_compile() {
@@ -6,8 +6,8 @@ src_compile() {
 	export NO_SYSTEMD=1
 	export PKG_CONFIG="$(tc-getPKG_CONFIG) --static"
 
-	gkmake -C utils/sysdeps V=1
-	gkmake -C utils/fwparam_ibft V=1
+	gkmake -C sysdeps V=1
+	gkmake -C usr/fwparam_ibft V=1
 	gkmake -C libopeniscsiusr V=1
 	gkmake -C usr -j1 V=1 iscsistart
 }

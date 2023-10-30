@@ -2,7 +2,7 @@
 # $Id$
 
 PATH="${PATH}:/sbin:/usr/sbin"
-GK_V='4.3.2'
+GK_V='4.3.8'
 
 # Normalize locales
 export LC_ALL=C
@@ -207,7 +207,7 @@ fi
 if isTrue "${KERNCACHE_IS_VALID}" && ! isTrue "${CMD_INSTALL}" && ! isTrue "${BUILD_RAMDISK}"
 then
 	error_msg="Nothing to do: Selected action does not include building initramfs."
-	error_msg+=" Because kerncache is valid, no kernel will be build."
+	error_msg+=" Because kerncache is valid, no kernel will be built."
 	error_msg+=" However, due to set --no-install option, we will not even install kernel binary from kerncache."
 	gen_die "${error_msg}"
 fi
@@ -289,7 +289,7 @@ then
 		:
 	else
 		print_warning 1 '' 1 0
-		print_warning 1 "Current kernel's LOCALVERSION is set to '${LOV}'; Will ignore set --kernel-localversion value '${KERNEL_LOCALVERSION}' because kernel was not build ..."
+		print_warning 1 "Current kernel's LOCALVERSION is set to '${LOV}'; Will ignore set --kernel-localversion value '${KERNEL_LOCALVERSION}' because kernel was not built ..."
 	fi
 fi
 
@@ -351,6 +351,16 @@ fi
 if isTrue "${BUILD_RAMDISK}"
 then
 	print_info 1 '' 1 0
+
+	if isTrue "${FIRMWARE}" || isTrue "${RAMDISKMODULES}"
+	then
+		# Check for suitable kmod
+		determine_KEXT
+		if ! isTrue "$(is_kext_supported_by_kmod "${KEXT}")"
+		then
+			gen_die "${KMOD_CMD} does not support chosen module compression algorithm. Please re-emerge sys-apps/kmod with USE=$(get_kext_kmod_use_flag "${KEXT}") enabled or adjust CONFIG_MODULE_COMPRESS_* kernel option!"
+		fi
+	fi
 
 	# Compile initramfs
 	create_initramfs

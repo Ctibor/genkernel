@@ -1,0 +1,24 @@
+--- a/libopeniscsiusr/Makefile
++++ b/libopeniscsiusr/Makefile
+@@ -50,7 +50,7 @@ EXTRA_MAN_FILE = libopeniscsiusr.h.3
+ OBJS = context.o misc.o session.o sysfs.o iface.o idbm.o node.o default.o
+ 
+ CFLAGS ?= -O2 -g
+-CFLAGS += -Wall -Werror -Wextra -fvisibility=hidden -fPIC
++CFLAGS += -Wextra -fvisibility=hidden -fPIC
+ CFLAGS += $(shell $(PKG_CONFIG) --cflags libkmod)
+ CFLAGS += -DSBINDIR=\"$(SBINDIR)\"
+ CFLAGS += -DISCSI_DB_ROOT=\"$(DBROOT)\"
+@@ -60,9 +60,10 @@ LDFLAGS += $(shell $(PKG_CONFIG) --libs libkmod)
+ 
+ LIBADD =
+ 
+-all: $(LIBS) $(LIBS_MAJOR) $(TESTS) doc
++all: $(LIBS) $(LIBS_MAJOR)
+ 
+ $(LIBS): $(OBJS)
++	$(AR) $(ARFLAGS) libopeniscsiusr.a $^
+ 	$(CC) $(CFLAGS) -shared -Wl,-soname=$@ -o $@ $(OBJS) $(LDFLAGS) $(LIBADD)
+ 	ln -sf $@ $(DEVLIB)
+ 
+-- 

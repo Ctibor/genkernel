@@ -97,7 +97,7 @@ StartUp() {
 		#// Hostname
 		hostname netboot
 
-		if [ -n "$(which dropbear 2>/dev/null)" ]
+		if [ -n "$(command -v dropbear 2>/dev/null)" ]
 		then
 			# Setup dropbear (sshd)
 			echo

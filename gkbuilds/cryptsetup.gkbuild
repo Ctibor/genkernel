@@ -11,6 +11,7 @@ src_configure() {
 	local myconf=(
 		--enable-internal-argon2
 		--sbindir=/sbin
+		--disable-asciidoc
 		--disable-nls
 		--disable-selinux
 		--disable-ssh-token

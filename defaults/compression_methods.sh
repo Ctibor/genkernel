@@ -37,6 +37,6 @@ GKICM_XZ_EXT=".xz"
 GKICM_XZ_PKG="app-arch/xz-utils"
 
 GKICM_ZSTD_KOPTNAME="ZSTD"
-GKICM_ZSTD_CMD="zstd -f -19 -q"
+GKICM_ZSTD_CMD="zstd -f -19 -q -T0"
 GKICM_ZSTD_EXT=".zst"
 GKICM_ZSTD_PKG="app-arch/zstd"
