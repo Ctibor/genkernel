@@ -2091,87 +2091,85 @@ openLUKS() {
 				else
 					cryptsetup_options="${cryptsetup_options} -d ${mntkey}${LUKS_KEY}"
 				fi
-				# Key stored inside TPM chip
-				elif [ -n "${LUKS_TPM}" ]
+			# Key stored inside TPM chip
+			elif [ -n "${LUKS_TPM}" ]
+			then
+				local REAL_TPM_KEYDEV="${LUKS_TPM_KEYDEV}"
+				if [ ! -e "${tpmmntkey}${LUKS_TPM_SESSION}" ]
 				then
-					local REAL_TPM_KEYDEV="${LUKS_TPM_KEYDEV}"
-					if [ ! -e "${tpmmntkey}${LUKS_TPM_SESSION}" ]
+					REAL_TPM_KEYDEV=$(find_real_device "${LUKS_TPM_KEYDEV}")
+					if [ -b "${REAL_TPM_KEYDEV}" ]
 					then
-						REAL_TPM_KEYDEV=$(find_real_device "${LUKS_TPM_KEYDEV}")
-						if [ -b "${REAL_TPM_KEYDEV}" ]
+						good_msg "Using key device ${REAL_TPM_KEYDEV}." ${CRYPT_SILENT}
+					else
+						good_msg "Please insert removable device ${REAL_TPM_KEYDEV} for ${LUKS_NAME}" ${CRYPT_SILENT}
+						# abort after 10 secs
+						local count=10
+						while [ ${count} -gt 0 ]
+						do
+							count=$((count-1))
+							sleep 1
+							REAL_TPM_KEYDEV=$(find_real_device "${LUKS_TPM_KEYDEV}")
+							if [ -b "${REAL_TPM_KEYDEV}" ]
+							then
+								good_msg "Removable device ${REAL_TPM_KEYDEV} detected." ${CRYPT_SILENT}
+								break
+							fi
+						done
+						if [ ! -b "${REAL_TPM_KEYDEV}" ]
 						then
-							good_msg "Using key device ${REAL_TPM_KEYDEV}." ${CRYPT_SILENT}
-						else
-							good_msg "Please insert removable device ${REAL_TPM_KEYDEV} for ${LUKS_NAME}" ${CRYPT_SILENT}
-							# abort after 10 secs
-							local count=10
-							while [ ${count} -gt 0 ]
-							do
-								count=$((count-1))
-								sleep 1
-								REAL_TPM_KEYDEV=$(find_real_device "${LUKS_TPM_KEYDEV}")
-								if [ -b "${REAL_TPM_KEYDEV}" ]
-								then
-									good_msg "Removable device ${REAL_TPM_KEYDEV} detected." ${CRYPT_SILENT}
-									break
-								fi
-							done
+							eval CRYPT_${TYPE}_TPM_SESSION=${TPM_KEY}
+							bootstrapKey ${TYPE}
+							eval LUKS_TPN_KEYDEV='"${CRYPT_'${TYPE}'_TPM_KEYDEV}"'
+							REAL_TPM_KEYDEV=$(find_real_device "${LUKS_TPM_KEYDEV}")
 							if [ ! -b "${REAL_TPM_KEYDEV}" ]
 							then
-								eval CRYPT_${TYPE}_TPM_SESSION=${TPM_KEY}
-								bootstrapKey ${TYPE}
-								eval LUKS_TPN_KEYDEV='"${CRYPT_'${TYPE}'_TPM_KEYDEV}"'
-								REAL_TPM_KEYDEV=$(find_real_device "${LUKS_TPM_KEYDEV}")
-								if [ ! -b "${REAL_TPM_KEYDEV}" ]
-								then
-									KEYDEV_ERROR=1
-									bad_msg "Removable device ${LUKS_TPM_KEYDEV} not found." ${CRYPT_SILENT}
-									continue
-								fi
-								# continue otherwise will mount keydev which is mounted by bootstrap
+								KEYDEV_ERROR=1
+								bad_msg "Removable device ${LUKS_TPM_KEYDEV} not found." ${CRYPT_SILENT}
 								continue
 							fi
-						fi
-						# At this point a device was recognized, now let's see if the key is there
-						[ ! -d "${tpmmntkey}" ] && mkdir -p "${tpmmntkey}" >/dev/null 2>&1
-
-						# determine fs -- 'auto' will not trigger module loading!
-						LUKS_TPM_KEYDEV_FSTYPE=$(determine_fs "${REAL_TPM_KEYDEV}" "${LUKS_TPM_KEYDEV_FSTYPE}")
-
-						if ! run mount -n -t ${LUKS_TPM_KEYDEV_FSTYPE} -o rw ${REAL_TPM_KEYDEV} ${tpmmntkey} >/dev/null 2>&1
-						then
-							TPMKEY_ERROR=1
-							bad_msg "Mounting of device ${REAL_TPM_KEYDEV} failed." ${CRYPT_SILENT}
+							# continue otherwise will mount keydev which is mounted by bootstrap
 							continue
-						else
-							good_msg "Removable device ${REAL_TPM_KEYDEV} mounted." ${CRYPT_SILENT}
-							sleep 2
-							# keyfile exists?
-							if [ ! -e "${tpmmntkey}${LUKS_TPM_SESSION}" ]
-							then
-								run umount -n "${tpmmntkey}" >/dev/null 2>&1
-								TPMKEY_ERROR=1
-								TPMDEV_ERROR=1
-								bad_msg "Key ${LUKS_TPM_SESSION} on device ${REAL_TPM_KEYDEV} not found." ${CRYPT_SILENT}
-								continue
-							fi
 						fi
 					fi
-					good_msg "Retrieving decryption key from TPM" ${CRYPT_SILENT}
-					if ! hash tpm2 >/dev/null 2>&1
+					# At this point a device was recognized, now let's see if the key is there
+					[ ! -d "${tpmmntkey}" ] && mkdir -p "${tpmmntkey}" >/dev/null 2>&1
+						# determine fs -- 'auto' will not trigger module loading!
+					LUKS_TPM_KEYDEV_FSTYPE=$(determine_fs "${REAL_TPM_KEYDEV}" "${LUKS_TPM_KEYDEV_FSTYPE}")
+					if ! run mount -n -t ${LUKS_TPM_KEYDEV_FSTYPE} -o rw ${REAL_TPM_KEYDEV} ${tpmmntkey} >/dev/null 2>&1
 					then
-						bad_msg "tpm2 utility not found in ramdisk. Was initramfs build without --tpm-root or --tpm-swap parameter?"
-						bad_msg "Falling back to passphrase usage!"
 						TPMKEY_ERROR=1
+						bad_msg "Mounting of device ${REAL_TPM_KEYDEV} failed." ${CRYPT_SILENT}
+						continue
 					else
-						/usr/bin/tpm2 loadexternal -Q -T "device:${CRYPT_TPM_DEVICE}" -G rsa -C o -u "${tpmmntkey}/${LUKS_TPM_PUBKEY}" -c "${tpmmntkey}/${LUKS_TPM_CTX}" -n "${tpmmntkey}/${LUKS_TPM_NAME}"
-						/usr/bin/tpm2 verifysignature -Q -T "device:${CRYPT_TPM_DEVICE}" -c "${tpmmntkey}/${LUKS_TPM_CTX}" -g sha256 -m "${tpmmntkey}/${LUKS_TPM_POLICY}" -s "${tpmmntkey}/${LUKS_TPM_SIGNATURE}" -t /tmp/verification.tkt -f rsassa
-						/usr/bin/tpm2 startauthsession -Q -T "device:${CRYPT_TPM_DEVICE}" --policy-session -S "${tpmmntkey}/${LUKS_TPM_SESSION}"
-						/usr/bin/tpm2 policypcr -Q -T "device:${CRYPT_TPM_DEVICE}" -l "${LUKS_TPM_PCRS}" -S "${tpmmntkey}/${LUKS_TPM_SESSION}"
-						/usr/bin/tpm2 policyauthorize -Q -T "device:${CRYPT_TPM_DEVICE}" -S "${tpmmntkey}/${LUKS_TPM_SESSION}" -i "${tpmmntkey}/${LUKS_TPM_POLICY}" -n "${tpmmntkey}/${LUKS_TPM_NAME}" -t /tmp/verification.tkt
-						cryptsetup_options="${cryptsetup_options} -d -"
-						get_luks_key="/usr/bin/tpm2 unseal -Q -T device:${CRYPT_TPM_DEVICE} -p session:${tpmmntkey}/${LUKS_TPM_SESSION} -c ${LUKS_TPM_HANDLE} |"
+						good_msg "Removable device ${REAL_TPM_KEYDEV} mounted." ${CRYPT_SILENT}
+						sleep 2
+						# keyfile exists?
+						if [ ! -e "${tpmmntkey}${LUKS_TPM_SESSION}" ]
+						then
+							run umount -n "${tpmmntkey}" >/dev/null 2>&1
+							TPMKEY_ERROR=1
+							TPMDEV_ERROR=1
+							bad_msg "Key ${LUKS_TPM_SESSION} on device ${REAL_TPM_KEYDEV} not found." ${CRYPT_SILENT}
+							continue
+						fi
 					fi
+				fi
+				good_msg "Retrieving decryption key from TPM" ${CRYPT_SILENT}
+				if ! hash tpm2 >/dev/null 2>&1
+				then
+					bad_msg "tpm2 utility not found in ramdisk. Was initramfs build without --tpm-root or --tpm-swap parameter?"
+					bad_msg "Falling back to passphrase usage!"
+					TPMKEY_ERROR=1
+				else
+					/usr/bin/tpm2 loadexternal -Q -T "device:${CRYPT_TPM_DEVICE}" -G rsa -C o -u "${tpmmntkey}/${LUKS_TPM_PUBKEY}" -c "${tpmmntkey}/${LUKS_TPM_CTX}" -n "${tpmmntkey}/${LUKS_TPM_NAME}"
+					/usr/bin/tpm2 verifysignature -Q -T "device:${CRYPT_TPM_DEVICE}" -c "${tpmmntkey}/${LUKS_TPM_CTX}" -g sha256 -m "${tpmmntkey}/${LUKS_TPM_POLICY}" -s "${tpmmntkey}/${LUKS_TPM_SIGNATURE}" -t /tmp/verification.tkt -f rsassa
+					/usr/bin/tpm2 startauthsession -Q -T "device:${CRYPT_TPM_DEVICE}" --policy-session -S "${tpmmntkey}/${LUKS_TPM_SESSION}"
+					/usr/bin/tpm2 policypcr -Q -T "device:${CRYPT_TPM_DEVICE}" -l "${LUKS_TPM_PCRS}" -S "${tpmmntkey}/${LUKS_TPM_SESSION}"
+					/usr/bin/tpm2 policyauthorize -Q -T "device:${CRYPT_TPM_DEVICE}" -S "${tpmmntkey}/${LUKS_TPM_SESSION}" -i "${tpmmntkey}/${LUKS_TPM_POLICY}" -n "${tpmmntkey}/${LUKS_TPM_NAME}" -t /tmp/verification.tkt
+					cryptsetup_options="${cryptsetup_options} -d -"
+					get_luks_key="/usr/bin/tpm2 unseal -Q -T device:${CRYPT_TPM_DEVICE} -p session:${tpmmntkey}/${LUKS_TPM_SESSION} -c ${LUKS_TPM_HANDLE} |"
+				fi
 			fi
 
 			if [ -n "${cryptsetup_options}" ]
