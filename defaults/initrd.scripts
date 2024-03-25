@@ -1896,7 +1896,7 @@ openLUKS() {
 	eval local LUKS_HEADER='"${CRYPT_'${TYPE}'_HEADER}"'
 	eval local LUKS_HEADERDEV='"${CRYPT_'${TYPE}'_HEADERDEV}"'
 	eval local LUKS_HEADERDEV_FSTYPE='"${CRYPT_'${TYPE}'_HEADERDEV_FSTYPE}"'
-	eval local LUKS_KEY='"${CRYPT_'${TYPE}'_KEY}"'
+	eval local LUKS_KEY='"${CRYPT_'${TYPE}'_KEYFILE}"'
 	eval local LUKS_KEYDEV='"${CRYPT_'${TYPE}'_KEYDEV}"'
 	eval local LUKS_KEYDEV_FSTYPE='"${CRYPT_'${TYPE}'_KEYDEV_FSTYPE}"'
 	eval local LUKS_TPM_KEYDEV_FSTYPE='"${CRYPT_'${TYPE}'_KEYDEV_FSTYPE}"'
@@ -2082,7 +2082,7 @@ openLUKS() {
 			fi
 
 			# Handle keys
-			if [ -n "${LUKS_KEY}" ]
+			if [ -n "${LUKS_KEY}" ] && [ -z "${LUKS_TPM}" ]
 			then
 				local REAL_LUKS_KEYDEV="${LUKS_KEYDEV}"
 				if [ ! -e "${mntkey}${LUKS_KEY}" ]
@@ -2158,6 +2158,7 @@ openLUKS() {
 					then
 						bad_msg "GPG-encrypted key file provided but gpg program is missing. Was initramfs built without --gpg parameter?"
 						bad_msg "Falling back to passphrase usage!"
+						
 					else
 						[ -e /dev/tty ] && run mv /dev/tty /dev/tty.org
 						run mknod /dev/tty c 5 1
@@ -2204,23 +2205,23 @@ openLUKS() {
 						done
 						if [ ! -b "${REAL_TPM_KEYDEV}" ]
 						then
-							eval CRYPT_${TYPE}_TPM_SESSION=${TPM_KEY}
+							eval CRYPT_${TYPE}_TPM_SESSION=${LUKS_TPM_SESSION}
 							bootstrapKey ${TYPE}
-							eval LUKS_TPN_KEYDEV='"${CRYPT_'${TYPE}'_TPM_KEYDEV}"'
+							eval LUKS_TPM_KEYDEV='"${CRYPT_'${TYPE}'_TPM_KEYDEV}"'
 							REAL_TPM_KEYDEV=$(find_real_device "${LUKS_TPM_KEYDEV}")
 							if [ ! -b "${REAL_TPM_KEYDEV}" ]
 							then
-								KEYDEV_ERROR=1
+								TPMDEV_ERROR=1
 								bad_msg "Removable device ${LUKS_TPM_KEYDEV} not found." ${CRYPT_SILENT}
 								continue
 							fi
-							# continue otherwise will mount keydev which is mounted by bootstrap
+							# continue otherwise will mount tpmdev which is mounted by bootstrap
 							continue
 						fi
 					fi
-					# At this point a device was recognized, now let's see if the key is there
+					# At this point a device was recognized, now let's see if the files are there
 					[ ! -d "${tpmmntkey}" ] && mkdir -p "${tpmmntkey}" >/dev/null 2>&1
-						# determine fs -- 'auto' will not trigger module loading!
+					# determine fs -- 'auto' will not trigger module loading!
 					LUKS_TPM_KEYDEV_FSTYPE=$(determine_fs "${REAL_TPM_KEYDEV}" "${LUKS_TPM_KEYDEV_FSTYPE}")
 					if ! run mount -n -t ${LUKS_TPM_KEYDEV_FSTYPE} -o rw ${REAL_TPM_KEYDEV} ${tpmmntkey} >/dev/null 2>&1
 					then
@@ -2278,18 +2279,6 @@ openLUKS() {
 				run touch "${OPENED_LOCKFILE}"
 				good_msg "LUKS device ${LUKS_DEVICE} opened" ${CRYPT_SILENT}
 				break
-			elif [ ${crypt_filter_ret} -ne 0 ] && [ -n "${LUKS_TPM}" ]
-			then
-				bad_msg "Failed to open LUKS device with TPM, trying passphrase" ${CRYPT_SILET}
-				cryptsetup_options=""
-				crypt_filter "cryptsetup luksOpen ${LUKS_DEVICE} ${LUKS_NAME}"
-				crypt_filter_ret=$?
-				if [ ${crypt_filter_ret} -eq 0 ]
-				then
-					run touch "${OPENED_LOCKFILE}"
-					good_msg "LUKS device ${LUKS_DEVICE} opened" ${CRYPT_SILENT}
-					break
-				fi
 			elif [ ! -e "${OPENED_LOCKFILE}" ]
 			then
 				bad_msg "Failed to open LUKS device ${LUKS_DEVICE}" ${CRYPT_SILENT}
