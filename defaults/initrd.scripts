@@ -855,6 +855,13 @@ setup_overlayfs() {
 		run mount --bind "${i}" "${NEW_ROOT}${i}"
 	done
 
+	# Setup the filesystem nodes and directories
+	# Copied from non-overlayfs logic earlier in this script
+	for i in ${CDROOT_PATH} /mnt/header /mnt/livecd /mnt/key /mnt/gentoo /tmp /tmp/.initrd /dev /proc /run /sys; do
+		run mkdir -p "${NEW_ROOT}${i}"
+		run chmod 755 "${NEW_ROOT}${i}"
+	done
+
 	# Did we populate the overlayfs modules path locations variable?
 	if [ -n "${mods}" ]
 	then

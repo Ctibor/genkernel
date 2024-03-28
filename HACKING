@@ -42,3 +42,9 @@ Rolling a release:
     git shortlog ${PREV_TAG}..v${PV} | xsel
 
   to generate the mail body.
+
+Changes:
+Changelogs prior to 2012 are available in Changelog.old [1], removed from
+regular distribution in commit 4ec9886457a58330843f5c46a38e73fda9957410.
+
+[1] https://gitweb.gentoo.org/proj/genkernel.git/tree/ChangeLog.old?id=71507545eec3031ade9b4f9a314c53216f2c97f2
